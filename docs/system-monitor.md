@@ -9,7 +9,7 @@ This first version is for open and personal installations. It is not exposed to 
 - **CPU:** total system utilization between samples, excluding idle and I/O wait. The first reading, or the first reading after a viewing gap, shows a dash until the next refresh.
 - **Memory:** system RAM in use, calculated using Linux's `MemAvailable` so reclaimable cache is not treated as unavailable memory. Hover over the percentage for used and total bytes.
 - **Temperature:** a recognized CPU/SoC thermal sensor in degrees Celsius. Missing or inaccessible sensors show a dash.
-- **Data disk:** usage of the filesystem containing the current settings database, including space reserved from ordinary users. It does not add up separate mail-storage volumes. Hover for used and total bytes.
+- **Storage:** usage of the filesystem containing the current settings database, including space reserved from ordinary users. It does not add up separate mail-storage volumes. A compact bar and percentage remain visible in the sidebar. Expand **System** for used, available, and total capacity. Available space excludes reserved blocks; used space includes them.
 - **Uptime:** system uptime.
 - **Gofer memory:** the Gofer process's resident memory (RSS), including resident shared pages; this is not just the Go heap.
 

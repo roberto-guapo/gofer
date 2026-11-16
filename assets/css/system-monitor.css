@@ -40,5 +40,21 @@
   white-space: nowrap;
 }
 .system-monitor-extra { padding: .25rem 0; }
+.system-monitor-storage {
+  display: block;
+  appearance: none;
+  width: 100%;
+  height: 3px;
+  margin: .2rem 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--sidebar-accent);
+  color: var(--sidebar-accent-foreground);
+}
+.system-monitor-storage::-webkit-progress-bar { background: var(--sidebar-accent); }
+.system-monitor-storage::-webkit-progress-value { background: var(--sidebar-accent-foreground); }
+.system-monitor-storage::-moz-progress-bar { background: var(--sidebar-accent-foreground); }
+.system-monitor[data-stale] .system-monitor-storage { opacity: .55; }
 .system-monitor-note { margin: .25rem 0 0; font-size: 10px; opacity: .8; }
 .system-monitor[data-stale] .system-monitor-value { opacity: .55; }

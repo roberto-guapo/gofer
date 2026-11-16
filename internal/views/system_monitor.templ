@@ -29,7 +29,9 @@ templ SystemMonitor() {
 					@icon.ChevronDown(icon.Props{Class: "system-monitor-chevron size-3 shrink-0"})
 				</summary>
 				<div class="system-monitor-extra">
-					@systemMonitorRow("disk", i18n.T(ctx, "monitor.disk"))
+					@systemMonitorRow("disk-used", i18n.T(ctx, "monitor.storage_used"))
+					@systemMonitorRow("disk-available", i18n.T(ctx, "monitor.storage_available"))
+					@systemMonitorRow("disk-total", i18n.T(ctx, "monitor.storage_total"))
 					@systemMonitorRow("uptime", i18n.T(ctx, "monitor.uptime"))
 					@systemMonitorRow("process", i18n.T(ctx, "monitor.process"))
 					<p class="system-monitor-note">{ i18n.T(ctx, "monitor.scope") }</p>
@@ -39,6 +41,8 @@ templ SystemMonitor() {
 				@systemMonitorRow("cpu", i18n.T(ctx, "monitor.cpu"))
 				@systemMonitorRow("memory", i18n.T(ctx, "monitor.memory"))
 				@systemMonitorRow("temperature", i18n.T(ctx, "monitor.temperature"))
+				@systemMonitorRow("disk", i18n.T(ctx, "monitor.disk"))
+				<progress class="system-monitor-storage" data-monitor-storage max="100" hidden aria-label={ i18n.T(ctx, "monitor.disk") }></progress>
 			</div>
 			<p class="system-monitor-note" data-monitor-status role="status">{ i18n.T(ctx, "js.monitor.loading") }</p>
 		</section>

@@ -40,6 +40,7 @@
   function percent(n) { return number(n) ? Math.round(n) + '%' : '—' }
   function bytes(n) {
     if (!number(n)) return '—'
+    if (n >= 1099511627776) return (n / 1099511627776).toFixed(1) + ' TiB'
     return n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GiB' : Math.round(n / 1048576) + ' MiB'
   }
   function usageTitle(u) {
@@ -51,6 +52,14 @@
     value('memory', percent(data.memory && data.memory.percent), usageTitle(data.memory))
     value('temperature', number(data.temperature_c) ? Math.round(data.temperature_c) + ' °C' : '—')
     value('disk', percent(data.disk && data.disk.percent), usageTitle(data.disk))
+    var disk = data.disk
+    value('disk-used', bytes(disk && disk.used))
+    value('disk-available', bytes(disk && disk.total - disk.used))
+    value('disk-total', bytes(disk && disk.total))
+    var storageBar = target.querySelector('[data-monitor-storage]')
+    storageBar.hidden = !disk || !number(disk.percent)
+    storageBar.value = storageBar.hidden ? 0 : Math.max(0, Math.min(100, disk.percent))
+    storageBar.title = usageTitle(disk)
     value('process', bytes(data.process_memory_bytes))
     var seconds = data.uptime_seconds
     value('uptime', number(seconds) ? goferT('js.monitor.uptime', {
