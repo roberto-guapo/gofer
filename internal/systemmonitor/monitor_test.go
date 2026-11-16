@@ -48,7 +48,7 @@ func TestOnDemandCacheAndIdleBaseline(t *testing.T) {
 	if reads != 0 {
 		t.Fatal("collector read before first request")
 	}
-	first := c.Sample("/data")
+	first := c.Sample("/data", RefreshInterval)
 	if reads != 1 || first.CPUPercent != nil {
 		t.Fatal("first sample must only establish a CPU baseline")
 	}
@@ -56,23 +56,23 @@ func TestOnDemandCacheAndIdleBaseline(t *testing.T) {
 	var group sync.WaitGroup
 	for i := 0; i < 20; i++ {
 		group.Add(1)
-		go func() { defer group.Done(); c.Sample("/data") }()
+		go func() { defer group.Done(); c.Sample("/data", RefreshInterval) }()
 	}
 	group.Wait()
 	if reads != 1 {
 		t.Fatalf("concurrent viewers caused %d reads", reads)
 	}
 	now = now.Add(RefreshInterval)
-	next := c.Sample("/data")
+	next := c.Sample("/data", RefreshInterval)
 	if reads != 2 || next.CPUPercent == nil || *next.CPUPercent != 40 {
 		t.Fatalf("second sample = %+v, reads = %d", next, reads)
 	}
 	now = now.Add(10 * time.Minute)
-	if c.Sample("/data").CPUPercent != nil {
+	if c.Sample("/data", RefreshInterval).CPUPercent != nil {
 		t.Fatal("CPU averaged across an inactive viewing gap")
 	}
 	before := reads
-	c.Sample("/other")
+	c.Sample("/other", RefreshInterval)
 	if reads != before+1 {
 		t.Fatal("disk path change reused another filesystem's cache")
 	}
@@ -80,8 +80,41 @@ func TestOnDemandCacheAndIdleBaseline(t *testing.T) {
 
 func TestMissingReadingsStayUnavailable(t *testing.T) {
 	c := &Collector{now: time.Now, read: func(string) reading { return reading{snapshot: Snapshot{Supported: true}} }}
-	s := c.Sample("/missing")
+	s := c.Sample("/missing", RefreshInterval)
 	if !s.Supported || s.SampledAt.IsZero() || s.CPUPercent != nil || s.Memory != nil || s.Disk != nil || s.TemperatureC != nil {
 		t.Fatalf("missing data fabricated readings: %+v", s)
+	}
+}
+
+func TestRefreshIntervals(t *testing.T) {
+	for _, tc := range []struct {
+		raw  string
+		want time.Duration
+	}{
+		{"", RefreshInterval}, {"15", RefreshInterval}, {"5", 5 * time.Second},
+		{"30", 30 * time.Second}, {"60", time.Minute}, {"0", RefreshInterval},
+		{"-1", RefreshInterval}, {"999", RefreshInterval}, {"bad", RefreshInterval},
+	} {
+		if got := Interval(tc.raw); got != tc.want {
+			t.Errorf("Interval(%q) = %v", tc.raw, got)
+		}
+	}
+	for _, interval := range []time.Duration{5 * time.Second, RefreshInterval, 30 * time.Second, time.Minute} {
+		now := time.Unix(1000, 0)
+		reads := 0
+		c := &Collector{now: func() time.Time { return now }, read: func(string) reading {
+			reads++
+			return reading{cpu: &cpuTimes{total: uint64(reads * 100), idle: uint64(reads * 60)}}
+		}}
+		c.Sample("/data", interval)
+		now = now.Add(interval - time.Millisecond)
+		c.Sample("/data", interval)
+		if reads != 1 {
+			t.Fatalf("cache expired before %v", interval)
+		}
+		now = now.Add(time.Millisecond)
+		if s := c.Sample("/data", interval); reads != 2 || s.CPUPercent == nil || *s.CPUPercent != 40 {
+			t.Fatalf("refresh at %v: %+v", interval, s)
+		}
 	}
 }

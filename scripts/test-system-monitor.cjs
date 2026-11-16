@@ -6,6 +6,7 @@ const vm = require('node:vm')
 const source = fs.readFileSync(path.join(__dirname, '../assets/js/system-monitor.js'), 'utf8')
 const messages = JSON.parse(fs.readFileSync(path.join(__dirname, '../internal/i18n/locales/en.json'), 'utf8'))
 const events = {}, bodyEvents = {}, windowEvents = {}, timers = new Map()
+let selectedInterval = null
 let nextTimer = 0, enabled = false, calls = 0, pending, intersection, observed
 function panel() {
   const nodes = {}
@@ -26,7 +27,7 @@ const document = {
 const context = {
   document, Number, AbortController,
   window: { addEventListener(name, fn) { windowEvents[name] = fn } },
-  GoferSettings: { get() { return enabled ? 'true' : 'false' } },
+  GoferSettings: { get(key) { return key === 'system_monitor_interval' ? selectedInterval : (enabled ? 'true' : 'false') }, set(key, value) { selectedInterval = value; bodyEvents['gofer:settings-changed']({detail:{key}}) } },
   goferT(key, params = {}) { return messages[key].replace(/\{(\w+)\}/g, (_, name) => params[name]) },
   setTimeout(fn, delay) { const id = ++nextTimer; timers.set(id, { fn, delay }); return id },
   clearTimeout(id) { timers.delete(id) },
@@ -102,6 +103,16 @@ async function main() {
   visible(true); runTimer(0)
   runTimer(5000); await tick()
   assert.equal(current.stale, true, 'request timeout shows unavailable state')
+  for (const [raw, delay] of [['5', 5000], ['30', 30000], ['60', 60000], ['invalid', 15000], ['toString', 15000], ['15', 15000]]) {
+    events.change({ target: { closest() { return { value: raw } } } })
+    assert.equal(timers.size, 1, 'interval change replaces the previous timer')
+    runTimer(delay)
+    pending.resolve({ status: 204, ok: true }); await tick()
+    assert.equal([...timers.values()][0].delay, delay, 'subsequent refresh uses chosen interval')
+  }
+  setting(false)
+  events.change({ target: { closest() { return { value: '5' } } } })
+  assert.equal(timers.size, 0, 'interval selection cannot start a disabled monitor')
   windowEvents.pagehide()
   assert.equal(timers.size, 0)
   console.log('System monitor: opt-in, visibility, navigation, aborts, timeout, stale state and formatting passed.')

@@ -1,7 +1,11 @@
 // One polling loop for the visible sidebar, with no worker when disabled.
 ;(function () {
   var key = 'system_monitor_enabled'
-  var interval = 15000
+  var intervalKey = 'system_monitor_interval'
+  function interval() {
+    var raw = typeof GoferSettings !== 'undefined' && GoferSettings.get(intervalKey)
+    return raw === '5' || raw === '15' || raw === '30' || raw === '60' ? Number(raw) * 1000 : 15000
+  }
   var target = null
   var observer = null
   var visible = false
@@ -87,7 +91,7 @@
         clearTimeout(timeout)
         if (ownGeneration !== generation) return
         controller = null
-        schedule(interval)
+        schedule(interval())
       })
   }
   function reconcile() {
@@ -120,6 +124,14 @@
   }
   document.body.addEventListener('gofer:settings-changed', function (event) {
     if (event.detail.key === key) reconcile()
+    if (event.detail.key === intervalKey) {
+      stop()
+      schedule(interval())
+    }
+  })
+  document.addEventListener('change', function (event) {
+    var input = event.target.closest('[data-system-monitor-interval]')
+    if (input && typeof GoferSettings !== 'undefined') GoferSettings.set(intervalKey, input.value)
   })
   document.addEventListener('visibilitychange', function () {
     if (document.hidden) stop()

@@ -1,4 +1,9 @@
 {
+  "monitor.interval_label": "Refresh frequency",
+  "monitor.interval.5": "5 seconds",
+  "monitor.interval.15": "15 seconds (default)",
+  "monitor.interval.30": "30 seconds",
+  "monitor.interval.60": "1 minute",
   "monitor.title": "System",
   "monitor.cpu": "CPU",
   "monitor.memory": "Memory",
@@ -8,7 +13,7 @@
   "monitor.process": "Gofer memory",
   "monitor.scope": "System readings; data disk is the filesystem holding your settings database. Unavailable readings show —.",
   "monitor.setting": "Show system monitor",
-  "monitor.description": "Show a compact monitor at the bottom of the sidebar. Refreshes every 15 seconds while visible, with no background collection when disabled.",
+  "monitor.description": "Show a compact monitor at the bottom of the sidebar. Refreshes while visible, with no background collection when disabled.",
   "monitor.linux_only": "Available on Linux, including Raspberry Pi OS.",
   "js.monitor.loading": "Waiting for readings…",
   "js.monitor.sampling": "CPU usage appears after the next refresh.",

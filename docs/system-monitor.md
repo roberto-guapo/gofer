@@ -1,6 +1,6 @@
 # Optional system monitor
 
-On Linux, including Raspberry Pi OS, open **Settings → Appearance → Show system monitor**. It is off by default. The widget sits above the sidebar footer in mail, contacts, calendar, and settings, using the active theme's colors and fonts. Click **System** to expand the details.
+On Linux, including Raspberry Pi OS, open **Settings → Appearance → Show system monitor**. It is off by default. The widget sits above the sidebar footer in mail, contacts, calendar, and settings, using the active theme's colors and fonts. Click **System** to expand the details. Choose **Refresh frequency** beside the monitor setting: 5, 15 (default), 30, or 60 seconds. Slower refreshes reduce collection and browser requests.
 
 This first version is for open and personal installations. It is not exposed to users of a managed installation. Open mode retains its normal behavior: anyone allowed to access the application can use the owner's settings and monitor. Windows and macOS show a disabled setting with a Linux availability note.
 
@@ -17,9 +17,9 @@ Readings describe the Linux environment visible to Gofer. In a container, `/proc
 
 ## Resource use
 
-The browser requests a snapshot every 15 seconds while the widget is on screen. It stops when the tab is hidden, the mobile sidebar is closed, or the preference is disabled. Requests time out after five seconds; failed readings are marked unavailable and retried.
+The browser requests a snapshot at the selected interval while the widget is on screen. It stops when the tab is hidden, the mobile sidebar is closed, or the preference is disabled. Requests time out after five seconds; failed readings are marked unavailable and retried.
 
-The server collects on demand and shares a 15-second cache across viewers of the same filesystem path. There is no collection ticker, subprocess, new dependency, or history database. The endpoint checks the saved preference before reading system statistics. It returns no data when disabled and is protected by the existing authentication middleware plus owner-mode checks.
+The server collects on demand and shares a cache lasting the selected interval across viewers of the same filesystem path. There is no collection ticker, subprocess, new dependency, or history database. The endpoint checks the saved preference before reading system statistics. It returns no data when disabled and is protected by the existing authentication middleware plus owner-mode checks.
 
 ## Maintaining the fork
 

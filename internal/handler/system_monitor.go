@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"path/filepath"
+	"time"
 
 	"github.com/cristianadrielbraun/gofer/internal/auth"
 	"github.com/cristianadrielbraun/gofer/internal/i18n"
@@ -18,7 +19,7 @@ func (h *Handler) systemMonitorHandler() http.HandlerFunc {
 	}
 }
 
-func (h *Handler) serveSystemMonitor(w http.ResponseWriter, r *http.Request, sample func(string) systemmonitor.Snapshot) {
+func (h *Handler) serveSystemMonitor(w http.ResponseWriter, r *http.Request, sample func(string, time.Duration) systemmonitor.Snapshot) {
 	w.Header().Set("Cache-Control", "no-store")
 	// The monitor belongs to the owner, just like owner diagnostics. A forged
 	// preference cannot expose host details to a managed-mode webmail user.
@@ -28,8 +29,11 @@ func (h *Handler) serveSystemMonitor(w http.ResponseWriter, r *http.Request, sam
 	}
 	var enabled bool
 	var diskPath string
+	var interval time.Duration
 	err := h.withUserDB(r.Context(), h.userID(r.Context()), func(db *storage.DB) error {
-		enabled = db.GetUISettings(r.Context(), h.userID(r.Context()))[systemmonitor.SettingKey] == "true"
+		settings := db.GetUISettings(r.Context(), h.userID(r.Context()))
+		enabled = settings[systemmonitor.SettingKey] == "true"
+		interval = systemmonitor.Interval(settings[systemmonitor.IntervalSettingKey])
 		diskPath = filepath.Dir(db.Path())
 		return nil
 	})
@@ -42,5 +46,5 @@ func (h *Handler) serveSystemMonitor(w http.ResponseWriter, r *http.Request, sam
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(sample(diskPath))
+	_ = json.NewEncoder(w).Encode(sample(diskPath, interval))
 }

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/cristianadrielbraun/gofer/internal/auth"
 	"github.com/cristianadrielbraun/gofer/internal/systemmonitor"
@@ -15,8 +16,11 @@ import (
 func TestSystemMonitorAccessAndOptIn(t *testing.T) {
 	h, db := newAccountOwnershipTestHandler(t)
 	reads := 0
-	sample := func(path string) systemmonitor.Snapshot {
+	sample := func(path string, interval time.Duration) systemmonitor.Snapshot {
 		reads++
+		if interval != time.Minute {
+			t.Errorf("interval = %v", interval)
+		}
 		if path != filepath.Dir(db.Path()) {
 			t.Errorf("disk path = %q", path)
 		}
@@ -39,7 +43,7 @@ func TestSystemMonitorAccessAndOptIn(t *testing.T) {
 	if reads != 0 {
 		t.Fatal("disabled monitor collected statistics")
 	}
-	if err := db.MergeUISettings(personal, "owner", map[string]string{systemmonitor.SettingKey: "true"}); err != nil {
+	if err := db.MergeUISettings(personal, "owner", map[string]string{systemmonitor.SettingKey: "true", systemmonitor.IntervalSettingKey: "60"}); err != nil {
 		t.Fatal(err)
 	}
 	for _, ctx := range []context.Context{t.Context(), auth.ContextWithMode(t.Context(), auth.ModePersonal), owner, auth.ContextWithMode(owner, auth.ModeManaged)} {

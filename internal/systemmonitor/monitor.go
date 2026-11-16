@@ -12,6 +12,21 @@ import (
 
 const RefreshInterval = 15 * time.Second
 const SettingKey = "system_monitor_enabled"
+const IntervalSettingKey = "system_monitor_interval"
+
+// Interval accepts only the refresh choices offered by the settings UI.
+func Interval(raw string) time.Duration {
+	switch raw {
+	case "5":
+		return 5 * time.Second
+	case "30":
+		return 30 * time.Second
+	case "60":
+		return time.Minute
+	default:
+		return RefreshInterval
+	}
+}
 
 func Supported() bool { return runtime.GOOS == "linux" }
 
@@ -52,17 +67,20 @@ func New() *Collector { return &Collector{now: time.Now, read: readSystem} }
 // Sample never waits to measure CPU. The first reading establishes a baseline;
 // the next request measures usage since that baseline. After a viewing gap it
 // starts again instead of presenting a long idle average as current usage.
-func (c *Collector) Sample(diskPath string) Snapshot {
+func (c *Collector) Sample(diskPath string, interval time.Duration) Snapshot {
+	if interval != 5*time.Second && interval != RefreshInterval && interval != 30*time.Second && interval != time.Minute {
+		interval = RefreshInterval
+	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	now := c.now()
 	age := now.Sub(c.last.SampledAt)
-	if !c.last.SampledAt.IsZero() && c.path == diskPath && age >= 0 && age < RefreshInterval {
+	if !c.last.SampledAt.IsZero() && c.path == diskPath && age >= 0 && age < interval {
 		return c.last
 	}
 	r := c.read(diskPath)
 	r.snapshot.SampledAt = now.UTC()
-	if age >= 0 && age <= 3*RefreshInterval && c.cpu != nil && r.cpu != nil {
+	if age >= 0 && age <= 3*interval && c.cpu != nil && r.cpu != nil {
 		r.snapshot.CPUPercent = cpuPercent(*c.cpu, *r.cpu)
 	}
 	c.last, c.cpu, c.path = r.snapshot, r.cpu, diskPath

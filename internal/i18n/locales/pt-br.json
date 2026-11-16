@@ -1,4 +1,9 @@
 {
+  "monitor.interval_label": "Frequência de atualização",
+  "monitor.interval.5": "5 segundos",
+  "monitor.interval.15": "15 segundos (padrão)",
+  "monitor.interval.30": "30 segundos",
+  "monitor.interval.60": "1 minuto",
   "monitor.title": "Sistema",
   "monitor.cpu": "CPU",
   "monitor.memory": "Memória",
@@ -8,7 +13,7 @@
   "monitor.process": "Memória do Gofer",
   "monitor.scope": "Dados do sistema; o disco de dados contém o banco de dados de configurações. Valores indisponíveis aparecem como —.",
   "monitor.setting": "Mostrar monitor do sistema",
-  "monitor.description": "Mostra um monitor compacto na parte inferior da barra lateral. Atualiza a cada 15 segundos enquanto estiver visível, sem coleta em segundo plano quando desativado.",
+  "monitor.description": "Mostra um monitor compacto na parte inferior da barra lateral. Atualiza enquanto estiver visível, sem coleta em segundo plano quando desativado.",
   "monitor.linux_only": "Disponível no Linux, incluindo Raspberry Pi OS.",
   "js.monitor.loading": "Aguardando dados…",
   "js.monitor.sampling": "O uso da CPU aparecerá na próxima atualização.",

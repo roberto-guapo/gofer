@@ -1,11 +1,13 @@
 package views
 
 import (
+	"fmt"
 	"github.com/cristianadrielbraun/gofer/internal/auth"
 	"github.com/cristianadrielbraun/gofer/internal/assetver"
 	"github.com/cristianadrielbraun/gofer/internal/i18n"
 	"github.com/cristianadrielbraun/gofer/internal/systemmonitor"
 	"github.com/cristianadrielbraun/gofer/components/icon"
+	"github.com/cristianadrielbraun/gofer/components/selectbox"
 	switchcomp "github.com/cristianadrielbraun/gofer/components/switch"
 )
 
@@ -68,6 +70,22 @@ templ SystemMonitorSettings(uiSettings map[string]string) {
 					Disabled: !systemmonitor.Supported(),
 					Attributes: templ.Attributes{"aria-describedby": "system-monitor-description", "aria-label": i18n.T(ctx, "monitor.setting"), "data-ui-setting-switch": systemmonitor.SettingKey},
 				})
+			</div>
+			<div class="settings-row border-t border-border/60 pt-5 flex items-center justify-between gap-6">
+				<span id="system-monitor-interval-label" class="text-sm font-medium text-foreground">{ i18n.T(ctx, "monitor.interval_label") }</span>
+				<div class="w-44 shrink-0">
+					{{ selected := fmt.Sprint(int(systemmonitor.Interval(uiSettings[systemmonitor.IntervalSettingKey]).Seconds())) }}
+					@selectbox.SelectBox(selectbox.Props{Class: "settings-select"}) {
+						@selectbox.Trigger(selectbox.TriggerProps{Name: systemmonitor.IntervalSettingKey, Class: "bg-background", DisableClear: true, Required: true, Disabled: !systemmonitor.Supported(), Attributes: templ.Attributes{"aria-labelledby": "system-monitor-interval-label", "data-system-monitor-interval": ""}}) {
+							@selectbox.Value() { { i18n.T(ctx, "monitor.interval."+selected) } }
+						}
+						@selectbox.Content(selectbox.ContentProps{NoSearch: true, Class: "mobile-sheet"}) {
+							for _, seconds := range []string{"5", "15", "30", "60"} {
+								@selectbox.Item(selectbox.ItemProps{Value: seconds, Selected: selected == seconds}) { { i18n.T(ctx, "monitor.interval."+seconds) } }
+							}
+						}
+					}
+				</div>
 			</div>
 		</div>
 	}
