@@ -550,6 +550,7 @@ templ SettingsSidebar(activeTab string, width string) {
 			@SettingsSidebarItem(activeTab, "export-import", i18n.T(ctx, "settings.section.export-import.title"))
 			@SettingsSidebarItem(activeTab, "about", i18n.T(ctx, "settings.section.about.title"))
 		</nav>
+		@SystemMonitor()
 		<div class="shrink-0 px-4 pb-3">
 			@WebmailSidebarLogout()
 		</div>
@@ -1276,6 +1277,7 @@ templ SidebarFolderIcon(iconName string) {
 }
 
 templ SidebarFooter() {
+	@SystemMonitor()
 	<div class="px-4 py-3 border-t border-sidebar-border">
 		<div class="flex items-center gap-1.5">
 			<a

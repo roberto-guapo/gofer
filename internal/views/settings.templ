@@ -639,6 +639,7 @@ templ SettingsAppearanceTab(uiSettings map[string]string) {
 				@fontSettingsCard(uiSettings)
 			}
 			@textWeightSettingsCard(uiSettings)
+			@SystemMonitorSettings(uiSettings)
 			<div class="settings-card bg-card rounded-lg border p-6 space-y-5">
 				<div>
 					<h3 class="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-1">{ i18n.T(ctx, "settings.messages.title") }</h3>
