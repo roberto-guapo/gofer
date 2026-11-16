@@ -36,6 +36,8 @@ The reorganized guides from #128 have been merged into `pi`. These fork-only not
 
 ## Bring in the author's improvements
 
+The optional [system monitor](./docs/system-monitor.md) is developed on `feature/system-monitor`, branched from `pi`. It is not included in `pi` until that feature branch is merged. Build and deploy the branch containing the feature to use it; an upstream release does not include it.
+
 Run these Git commands from the repository on the development computer. They work in PowerShell or a Linux shell. Start with a clean working tree: commit work that should be kept, or stash it and remember to restore it later.
 
 ```sh
