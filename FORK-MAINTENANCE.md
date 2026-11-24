@@ -10,33 +10,31 @@ For installation and updates on the Raspberry Pi, start with [Installing my fork
 | --- | --- |
 | `origin` | My fork: `https://github.com/roberto-guapo/gofer.git` |
 | `upstream` | Original project: `https://github.com/cristianadrielbraun/gofer.git` |
-| `pi` | My combined version; merge upstream improvements here and deploy this branch. |
 | `upstream/master` | Local record of upstream's master branch, refreshed by `git fetch upstream`. |
-| Individual PR branches | Focused changes submitted upstream; keep unrelated work out of them. |
+| `pi` | Upstream's `master` plus my own commits, listed below. Merge upstream improvements here and deploy this branch. |
+| `backup/*` | Recovery points made before syncing or rebuilding `pi`. Delete them once the new `pi` has been running without problems. |
 
-My local `master` and `origin/master` contained the original Raspberry Pi documentation commit when these notes were written. Do not assume either is a clean upstream base. Use a freshly fetched `upstream/master` for a new PR.
+My local `master` and `origin/master` are old and contain early work of mine. They are not a clean upstream base, and `pi` is not built from them. Use a freshly fetched `upstream/master` for anything new.
 
-## Changes being maintained
+On November 23, 2026, `pi` was rebuilt as upstream's `master` with my commits applied on top, replacing the earlier history of merges from `master` and feature branches. The older branches `feature/system-monitor`, `feature/calendar-week-start` and `fork-docs` are kept for reference only; `pi` no longer merges them.
 
-Snapshot: November 15, 2026. PR status can change; use the links to check it.
+## What `pi` adds to upstream
 
-| Change | PR branch | Upstream PR |
-| --- | --- | --- |
-| Mail card action buttons | `card-action-buttons` | [#124](https://github.com/cristianadrielbraun/gofer/pull/124) |
-| Compose keyboard tab order | `compose-tab-order` | [#125](https://github.com/cristianadrielbraun/gofer/pull/125) |
-| Windows SQLite paths | `windows-sqlite-path` | [#126](https://github.com/cristianadrielbraun/gofer/pull/126) |
-| Preserve unread state in unread-only views | `fix/unread-only-selection` | [#127](https://github.com/cristianadrielbraun/gofer/pull/127) |
-| Raspberry Pi and shared setup guides | `raspberry-pi-setup` | [#128](https://github.com/cristianadrielbraun/gofer/pull/128) |
+As of November 23, 2026:
 
-`pi` contains the original combined application work. The PR branches were prepared separately, and #124–#126 had their histories rewritten to remove Claude attribution. Their commit IDs differ from commits already on `pi`; do not merge every PR branch just to make the IDs match.
+| Change | Status upstream |
+| --- | --- |
+| Optional Linux [system monitor](./docs/system-monitor.md) in the sidebar | Fork only. Not submitted. |
+| Stop the message frame growing without end around emails that size themselves to it | Fixed on `pi`; not yet reported or submitted upstream. A pull request needs a test that fails without the fix. |
+| These notes and [the Pi installation guide](./docs/raspberry-pi-fork.md) | Fork only. |
 
-The Windows change on `pi` is an earlier startup workaround. PR #126 also uses a shared URI helper for migration copies and adds a test. They are not identical implementations. Reconcile them deliberately if bringing the PR version into `pi`.
+Earlier changes no longer need maintaining here:
 
-The reorganized guides from #128 have been merged into `pi`. These fork-only notes are not part of that PR.
+- Mail card action buttons ([#124](https://github.com/cristianadrielbraun/gofer/pull/124)), compose tab order ([#125](https://github.com/cristianadrielbraun/gofer/pull/125)), opening the database on Windows ([#126](https://github.com/cristianadrielbraun/gofer/pull/126)) and the Raspberry Pi setup guides ([#128](https://github.com/cristianadrielbraun/gofer/pull/128)) were merged upstream.
+- Keeping messages unread in unread-only views ([#127](https://github.com/cristianadrielbraun/gofer/pull/127)) was declined. Upstream did it differently instead: reading a message marks it read but leaves it in the Unread list until the list is refreshed.
+- My first-day-of-week setting was replaced by upstream's, which offers Saturday, Sunday or Monday and also covers date pickers. Upstream saves the setting differently, so a week start chosen with my version is ignored until it is chosen again in Settings › Regional.
 
 ## Bring in the author's improvements
-
-Fork-only features live on their own branches cut from `master`: the optional [system monitor](./docs/system-monitor.md) on `feature/system-monitor` and the first-day-of-week setting on `feature/calendar-week-start`. `pi` is rebuilt from `master` by merging those branches and `fork-docs`; an upstream release does not include them.
 
 Run these Git commands from the repository on the development computer. They work in PowerShell or a Linux shell. Start with a clean working tree: commit work that should be kept, or stash it and remember to restore it later.
 
@@ -54,17 +52,16 @@ git branch backup/pi-before-sync-YYYYMMDD
 git merge upstream/master
 ```
 
-Review and test the result before publishing or installing it. Useful checks for the existing custom changes include:
+Review and test the result before publishing or installing it. Run the Go tests on Linux, such as WSL, the Pi or a Docker build: on Windows, many of them fail for reasons unrelated to Gofer, such as Unix socket paths, symlinks and timer precision.
 
 ```sh
 git diff --check
-node scripts/test-compose-tab-order.cjs
-node scripts/test-compose-one-time-from.cjs
-node scripts/test-mail-auto-read.cjs
-go test ./internal/views ./internal/i18n
+go test ./internal/systemmonitor ./internal/views ./internal/i18n
+go test ./internal/handler -run SystemMonitor
+node scripts/test-system-monitor.cjs
 ```
 
-Run other tests relevant to upstream's changes, and build the release as described in the [Pi instructions](./docs/raspberry-pi-fork.md#build-my-version). These checks are a starting point, not a complete regression suite. In the app, check compose tab order, configured card actions, and unread-only selection before relying on the new build.
+Run other tests relevant to upstream's changes, or `go test ./...` for a large update, and build the release as described in the [Pi instructions](./docs/raspberry-pi-fork.md#build-my-version). A test that fails here should be checked against `upstream/master` in the same environment before blaming the merge. In the app, check the system monitor and open a few HTML newsletters before relying on the new build.
 
 ```sh
 git push -u origin pi
@@ -75,9 +72,10 @@ Use ordinary merges and pushes for this long-lived branch. Routine upstream upda
 ### If there is a conflict
 
 1. Run `git status` to see the affected files.
-2. Edit each file to keep the intended behavior from both versions. Remove the `<<<<<<<`, `=======`, and `>>>>>>>` markers.
-3. Stage each resolved file with `git add path/to/file`.
-4. Finish with `git commit`, then test before pushing.
+2. For generated `*_templ.go` files, don't merge by hand. Take either version, then run `templ generate --ignore-pattern='(^|/)dist(/|$)'` from the repository root with the templ version named in `go.mod`, so they are rebuilt from the merged `.templ` files.
+3. Edit each other file to keep the intended behavior from both versions. Remove the `<<<<<<<`, `=======`, and `>>>>>>>` markers.
+4. Stage each resolved file with `git add path/to/file`.
+5. Finish with `git commit`, then test before pushing.
 
 To cancel a merge while it is still in progress:
 
@@ -86,6 +84,24 @@ git merge --abort
 ```
 
 If upstream accepts or independently implements one of my changes, compare the behavior and resolve overlap during the merge. Do not automatically delete the feature or cherry-pick it again. A squash merge upstream may use different commit IDs for the same work.
+
+### Rebuild `pi` from upstream
+
+When `pi`'s history gets tangled, for example after reverting a change upstream replaced, it can be rebuilt instead of merged: start from `upstream/master` and reapply only my own commits.
+
+```sh
+git fetch upstream
+git log --oneline --no-merges upstream/master..pi   # the commits to keep
+git switch -c pi-rebuild upstream/master
+git cherry-pick COMMIT_SHA ...                     # oldest first; regenerate templ files on conflict
+git diff --stat pi pi-rebuild                      # should list only intended differences
+git branch backup/pi-before-rebuild-YYYYMMDD pi
+git branch -f pi pi-rebuild
+git switch pi
+git branch -D pi-rebuild
+```
+
+This rewrites `pi`'s history. Once `pi` is on GitHub, publishing a rebuilt `pi` needs `git push --force-with-lease origin pi`, and the Pi's checkout then has to be reset to it instead of pulled. Prefer ordinary merges once `pi` is pushed.
 
 ## Make another focused PR
 
@@ -101,12 +117,10 @@ git log --format=full upstream/master..HEAD
 git push -u origin fix/descriptive-name
 ```
 
-Open the PR from this new branch to `cristianadrielbraun/gofer:master`. Keep its title and summary limited to that change. Upstream has requested no Claude/AI author trailers or generated-by footer in commits or summaries; inspect the commit messages before submitting. Return to `pi` with `git switch pi` afterward.
+Open the PR from this new branch to `cristianadrielbraun/gofer:master`. Keep its title and summary limited to that change, and follow upstream's [CONTRIBUTING.md](./CONTRIBUTING.md): every fix needs a test that fails without it, and commits and summaries carry no Claude/AI author trailers or generated-by footer. Inspect the commit messages before submitting. Return to `pi` with `git switch pi` afterward.
 
 ## Local checkout reminders
 
-Some PR branches are checked out in worktrees under `dist/`. `git worktree list` shows them. If Git says a branch is already checked out, use that worktree rather than forcing a second checkout.
-
-In this Windows checkout, avoid `task clean` and `task release:all`: their scripts remove `dist/`, which currently contains those worktrees. `task release` builds the single binary without deleting that directory. Build on the Pi or in a dedicated Linux checkout using the installation notes.
+`task clean` and `task release:all` delete `dist/`. In this checkout it only holds build outputs, so that is safe, but move anything there that should be kept first.
 
 Keep these notes updated when the branch arrangement or deployment changes. Never put actual passwords, OAuth secrets, or setup tokens in Git.
