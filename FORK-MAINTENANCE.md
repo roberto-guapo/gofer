@@ -11,10 +11,19 @@ For installation and updates on the Raspberry Pi, start with [Installing my fork
 | `origin` | My fork: `https://github.com/roberto-guapo/gofer.git` |
 | `upstream` | Original project: `https://github.com/cristianadrielbraun/gofer.git` |
 | `upstream/master` | Local record of upstream's master branch, refreshed by `git fetch upstream`. |
-| `pi` | Upstream's `master` plus my own commits, listed below. Merge upstream improvements here and deploy this branch. |
+| `master` | A clean copy of upstream's `master` with nothing of mine on it. Never commit to it; bring it up to date instead. |
+| `pi` | `master` plus my own commits, listed below. Merge upstream improvements here and deploy this branch. |
 | `backup/*` | Recovery points made before syncing or rebuilding `pi`. Delete them once the new `pi` has been running without problems. |
 
-My local `master` and `origin/master` are old and contain early work of mine. They are not a clean upstream base, and `pi` is not built from them. Use a freshly fetched `upstream/master` for anything new.
+To bring `master`, and my fork's copy of it, up to date with upstream:
+
+```sh
+git fetch upstream
+git fetch . upstream/master:master
+git push origin master
+```
+
+The second command only fast-forwards. If it refuses, something was committed to `master`; find it with `git log upstream/master..master` and move it to its own branch before trying again.
 
 On November 23, 2026, `pi` was rebuilt as upstream's `master` with my commits applied on top, replacing the earlier history of merges from `master` and feature branches. The older branches `feature/system-monitor`, `feature/calendar-week-start` and `fork-docs` are kept for reference only; `pi` no longer merges them.
 
