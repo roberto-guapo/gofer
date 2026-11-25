@@ -269,13 +269,19 @@ func (o *SyncOrchestrator) syncOutlookGraphFolders(ctx context.Context, accountI
 		role := outlookGraphFolderRole(folder)
 		order := outlookGraphFolderSortOrder(role, i)
 		remoteName := outlookGraphFolderRemoteName(folder)
+		name := displayName(remoteName, role)
+		// Shown under its parent, the folder needs only its own name, as it
+		// gets when it's created or renamed in Gofer and as IMAP folders show.
+		if parentID != "" && role == "custom" {
+			name = folder.DisplayName
+		}
 		inputs = append(inputs, storage.UpsertFolderInput{
 			ID:               localID,
 			AccountID:        accountID,
 			ParentID:         parentID,
 			RemoteID:         remoteName,
 			ProviderRemoteID: folder.ID,
-			Name:             displayName(remoteName, role),
+			Name:             name,
 			Icon:             imap.RoleIcon(role),
 			Role:             role,
 			Selectable:       true,
