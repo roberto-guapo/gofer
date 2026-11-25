@@ -258,6 +258,18 @@ func TestSyncOutlookGraphFoldersImportsNestedFolders(t *testing.T) {
 	if child.ID == "" || child.RemoteID != "Projects/Client A" || childParentID != parent.ID {
 		t.Fatalf("child folder = %#v parent_id=%q parent=%#v, want nested Graph folder", child, childParentID, parent)
 	}
+	// Shown under its parent, a nested folder needs only its own name, as it
+	// gets when it's created or renamed in Gofer.
+	var parentName, childName string
+	if err := db.Read().QueryRowContext(ctx, `SELECT name FROM folders WHERE id = ?`, parent.ID).Scan(&parentName); err != nil {
+		t.Fatalf("query parent name: %v", err)
+	}
+	if err := db.Read().QueryRowContext(ctx, `SELECT name FROM folders WHERE id = ?`, child.ID).Scan(&childName); err != nil {
+		t.Fatalf("query child name: %v", err)
+	}
+	if parentName != "Projects" || childName != "Client A" {
+		t.Fatalf("folder names parent=%q child=%q, want Projects and Client A", parentName, childName)
+	}
 	if len(targets) != 2 {
 		t.Fatalf("targets = %#v, want parent and child targets", targets)
 	}
