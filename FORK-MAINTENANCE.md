@@ -29,13 +29,18 @@ On November 23, 2026, `pi` was rebuilt as upstream's `master` with my commits ap
 
 ## What `pi` adds to upstream
 
-As of November 23, 2026:
+As of November 24, 2026:
 
 | Change | Status upstream |
 | --- | --- |
 | Optional Linux [system monitor](./docs/system-monitor.md) in the sidebar | Fork only. Not submitted. |
 | Stop the message frame growing without end around emails that size themselves to it | Fixed on `pi`; not yet reported or submitted upstream. A pull request needs a test that fails without the fix. |
+| Show Outlook subfolders by their own name, such as "Conflicts" instead of "Sync Issues/Conflicts" | Fixed on `pi`, with a test. Not yet reported or submitted; the upstream-based branch is `fix/outlook-subfolder-names`. |
 | These notes and [the Pi installation guide](./docs/raspberry-pi-fork.md) | Fork only. |
+
+Kept off `pi` on purpose:
+
+- **Stop rereading whole Outlook folders for messages without a sender**, on branch `fix/outlook-sender-repair-once`. Without it, an Outlook folder holding an item that has no sender, such as a draft in Deleted Items, is downloaded in full on every sync. The fix raises the database schema to version 154, and a schema number upstream hasn't taken could clash with a later upstream one. Wait for upstream to accept it, or renumber it, before deploying. Until then, emptying that folder in Outlook on the web stops the repeated downloads.
 
 Earlier changes no longer need maintaining here:
 
