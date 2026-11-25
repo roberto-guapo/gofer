@@ -3946,10 +3946,51 @@ func (db *DB) UpdateFolderIncrementalSync(ctx context.Context, folderID string, 
 	return err
 }
 
+// migrateV153ToV154 lets folders record when their last finished full sync
+// started. Folders start without it, as if they had never been fully synced
+// since.
+func migrateV153ToV154(db *sql.DB) error {
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var version int
+	if err := tx.QueryRow(`SELECT COALESCE(MAX(version),0) FROM schema_version`).Scan(&version); err != nil {
+		return err
+	}
+	if version >= 154 {
+		return nil
+	}
+	exists, err := tableExistsTx(tx, "folders")
+	if err != nil {
+		return err
+	}
+	if exists {
+		present, err := columnExistsTx(tx, "folders", "last_full_sync_started_at")
+		if err != nil {
+			return err
+		}
+		if !present {
+			if _, err := tx.Exec(`ALTER TABLE folders ADD COLUMN last_full_sync_started_at DATETIME`); err != nil {
+				return err
+			}
+		}
+	}
+	if err := markSchemaVersion(tx, 154); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// UpdateProviderFolderSyncState saves where a provider folder's sync ended.
+// A full sync also records when it started, as StartProviderFolderBaseline
+// noted it; it's empty when the full sync didn't start that way.
 func (db *DB) UpdateProviderFolderSyncState(ctx context.Context, folderID, cursor string, totalCount, unreadCount int, full bool) error {
 	if full {
 		_, err := db.Write().ExecContext(ctx,
 			`UPDATE folders SET sync_cursor = ?, total_count = ?, unread_count = ?,
+			 last_full_sync_started_at = sync_progress_started_at,
 			 sync_progress_current = 0, sync_progress_started_at = NULL,
 			 last_full_sync_at = CURRENT_TIMESTAMP, sync_error = NULL,
 			 provider_count_drift_first_seen_at = NULL,
@@ -4013,6 +4054,16 @@ func (db *DB) GetProviderFolderMessageCount(ctx context.Context, accountID, fold
 	return count, err
 }
 
+// HasProviderFolderMessagesMissingSender reports whether the folder has a
+// provider message saved without a sender that a full sync could still fill
+// in. A message synced since the last finished full sync started was already
+// read in full, so a sender it lacks isn't on the server either, as with a
+// draft, and it doesn't count. Without a finished full sync on record, every
+// message without a sender counts.
+//
+// synced_at is compared by its first 19 characters, "YYYY-MM-DD HH:MM:SS"
+// in UTC, because Go times are saved with a suffix such as "+0000 UTC" that
+// SQLite's date functions can't read.
 func (db *DB) HasProviderFolderMessagesMissingSender(ctx context.Context, accountID, folderID string) (bool, error) {
 	accountID = strings.TrimSpace(accountID)
 	folderID = strings.TrimSpace(folderID)
@@ -4024,11 +4075,15 @@ func (db *DB) HasProviderFolderMessagesMissingSender(ctx context.Context, accoun
 		SELECT 1
 		FROM message_folder_state mfs
 		JOIN messages m ON m.id = mfs.message_id
+		JOIN folders f ON f.id = mfs.folder_id
 		WHERE mfs.folder_id = ?
 		  AND mfs.is_deleted = 0
 		  AND m.account_id = ?
 		  AND COALESCE(mfs.remote_message_id, '') != ''
 		  AND trim(COALESCE(m.from_email, '')) = ''
+		  AND (julianday(f.last_full_sync_started_at) IS NULL
+		       OR julianday(substr(mfs.synced_at, 1, 19)) IS NULL
+		       OR julianday(substr(mfs.synced_at, 1, 19)) < julianday(f.last_full_sync_started_at))
 		LIMIT 1`, folderID, accountID).Scan(&exists)
 	if err == sql.ErrNoRows {
 		return false, nil

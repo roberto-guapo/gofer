@@ -1031,6 +1031,60 @@ func TestSyncOutlookGraphFolderFullReconcilesMissingSenderMetadata(t *testing.T)
 	}
 }
 
+// A message the server has no sender for, such as a draft, is still without
+// one after a full sync, and the next sync doesn't read the whole folder
+// again to look for it.
+func TestSyncOutlookGraphFolderSkipsFullSyncForMessageWithoutSenderOnServer(t *testing.T) {
+	ctx := context.Background()
+	db := newLabelSyncTestDB(t)
+	seedOutlookGraphFolder(t, ctx, db)
+
+	draft := map[string]any{
+		"id":                "graph-draft-1",
+		"internetMessageId": "<graph-draft-1@example.com>",
+		"subject":           "Lunch on Friday?",
+		"isDraft":           true,
+	}
+	var baselineRequests, deltaRequests int
+	var server *httptest.Server
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/me/mailFolders/folder-inbox/messages/delta":
+			baselineRequests++
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"value":            []map[string]any{draft},
+				"@odata.deltaLink": server.URL + "/delta/current",
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/me/messages/graph-draft-1":
+			// Asked for in full, the draft still has no sender.
+			_ = json.NewEncoder(w).Encode(draft)
+		case r.Method == http.MethodGet && r.URL.Path == "/delta/current":
+			deltaRequests++
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"value":            []map[string]any{},
+				"@odata.deltaLink": server.URL + "/delta/current",
+			})
+		default:
+			t.Fatalf("unexpected Graph request %s %s", r.Method, r.URL.String())
+		}
+	}))
+	defer server.Close()
+
+	previousBaseURL := outlookGraphBaseURL
+	outlookGraphBaseURL = server.URL
+	t.Cleanup(func() { outlookGraphBaseURL = previousBaseURL })
+
+	orchestrator := NewSyncOrchestrator(db, nil, nil, labelSyncTestTokens{})
+	for range 2 {
+		if err := orchestrator.syncOutlookGraphFolder(ctx, "acc", "graph-token", outlookGraphInboxTargetFromDB(t, ctx, db), nil, 1, 1); err != nil {
+			t.Fatalf("syncOutlookGraphFolder() error = %v", err)
+		}
+	}
+	if baselineRequests != 1 || deltaRequests != 1 {
+		t.Fatalf("full sync requests = %d, change requests = %d; want one of each", baselineRequests, deltaRequests)
+	}
+}
+
 func TestSyncOutlookGraphFolderHydratesIncompleteDeltaMessage(t *testing.T) {
 	ctx := context.Background()
 	db := newLabelSyncTestDB(t)

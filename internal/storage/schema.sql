@@ -89,7 +89,10 @@ CREATE TABLE IF NOT EXISTS folders (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- A role the user gave an IMAP folder by hand, which the folder sync puts
     -- before the one the server reports; '' for none.
-    role_choice TEXT NOT NULL DEFAULT ''
+    role_choice TEXT NOT NULL DEFAULT '',
+    -- When the last finished full sync of a provider folder had started.
+    -- Messages synced since then were read in full from the server.
+    last_full_sync_started_at DATETIME
 );
 
 CREATE TABLE IF NOT EXISTS folder_id_aliases (
@@ -2057,4 +2060,4 @@ CREATE TABLE IF NOT EXISTS account_idle_limits (
     updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-INSERT OR REPLACE INTO schema_version (version) VALUES (153);
+INSERT OR REPLACE INTO schema_version (version) VALUES (154);

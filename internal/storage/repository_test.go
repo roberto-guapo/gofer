@@ -3335,3 +3335,152 @@ func TestCountUnreadOutsideSkippedFolders(t *testing.T) {
 		t.Fatalf("CountUnreadOutsideSkippedFolders() = %d, want 2", got)
 	}
 }
+
+// Upgrading lets folders record when their last finished full sync started,
+// and they have none recorded at first.
+func TestMigrateV153ToV154AddsFolderFullSyncStart(t *testing.T) {
+	db := newContactsTestDB(t)
+	ctx := t.Context()
+	if _, err := db.Write().ExecContext(ctx, `INSERT INTO accounts (id, user_id, provider, email_address) VALUES ('acc', 'default', 'outlook', 'alex@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertFolders(ctx, []UpsertFolderInput{{ID: "acc_inbox", AccountID: "acc", RemoteID: "Inbox", Name: "Inbox", Role: "inbox", Selectable: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write().Exec(`ALTER TABLE folders DROP COLUMN last_full_sync_started_at`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write().Exec(`DELETE FROM schema_version`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write().Exec(`INSERT INTO schema_version (version) VALUES (153)`); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := migrateV153ToV154(db.Write()); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n := countRows(t, db, `SELECT MAX(version) FROM schema_version`); n != 154 {
+		t.Fatalf("schema version = %d, want 154", n)
+	}
+	var started sql.NullString
+	if err := db.Read().QueryRow(`SELECT last_full_sync_started_at FROM folders WHERE id = 'acc_inbox'`).Scan(&started); err != nil || started.Valid {
+		t.Fatalf("last_full_sync_started_at = %v, %v; want none", started, err)
+	}
+}
+
+// A database from before folders is upgraded without adding them.
+func TestMigrateV153ToV154WithoutFolders(t *testing.T) {
+	raw, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer raw.Close()
+	raw.SetMaxOpenConns(1)
+	if _, err := raw.Exec(`CREATE TABLE schema_version (version INTEGER PRIMARY KEY, applied_at DATETIME DEFAULT CURRENT_TIMESTAMP)`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := raw.Exec(`INSERT INTO schema_version (version) VALUES (153)`); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := migrateV153ToV154(raw); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var version int
+	if err := raw.QueryRow(`SELECT MAX(version) FROM schema_version`).Scan(&version); err != nil || version != 154 {
+		t.Fatalf("version = %d, %v", version, err)
+	}
+	if exists, err := tableExists(raw, "folders"); err != nil || exists {
+		t.Fatalf("folders exists = %v, %v", exists, err)
+	}
+}
+
+// A message without a sender asks for a full sync only when it wasn't synced
+// since the last finished full sync started: a full sync would have filled
+// the sender in if the server had one.
+func TestHasProviderFolderMessagesMissingSenderSkipsMessagesReadInFull(t *testing.T) {
+	db := newContactsTestDB(t)
+	ctx := t.Context()
+	if _, err := db.Write().ExecContext(ctx, `INSERT INTO accounts (id, user_id, provider, email_address) VALUES ('acc', 'default', 'outlook', 'alex@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertFolders(ctx, []UpsertFolderInput{{ID: "acc_inbox", AccountID: "acc", RemoteID: "Inbox", ProviderRemoteID: "folder-inbox", Name: "Inbox", Role: "inbox", Selectable: true}}); err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now()
+	if _, err := db.UpsertProviderSyncMessages(ctx, []ProviderSyncMessage{{
+		AccountID: "acc", FolderID: "acc_inbox", ProviderMessageID: "graph-draft-1",
+		InternetMessageID: "<graph-draft-1@example.com>", Subject: "Lunch on Friday?", DateSent: now, DateReceived: now, IsDraft: true,
+	}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, started, synced string
+		want                  bool
+	}{
+		{"no full sync on record", "", "2026-03-10 09:00:05.123456789 +0000 UTC", true},
+		{"synced before the full sync started", "2026-03-10 09:00:00", "2026-03-10 08:59:59.987654321 +0000 UTC", true},
+		{"synced as the full sync started", "2026-03-10 09:00:00", "2026-03-10 09:00:00.5 +0000 UTC", false},
+		{"synced after the full sync", "2026-03-10 09:00:00", "2026-03-10 09:30:00.25 +0000 UTC", false},
+		{"synced by SQLite after the full sync", "2026-03-10 09:00:00", "2026-03-10 09:30:00", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var started any
+			if tc.started != "" {
+				started = tc.started
+			}
+			if _, err := db.Write().ExecContext(ctx, `UPDATE folders SET last_full_sync_started_at = ? WHERE id = 'acc_inbox'`, started); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := db.Write().ExecContext(ctx, `UPDATE message_folder_state SET synced_at = ? WHERE folder_id = 'acc_inbox'`, tc.synced); err != nil {
+				t.Fatal(err)
+			}
+			got, err := db.HasProviderFolderMessagesMissingSender(ctx, "acc", "acc_inbox")
+			if err != nil || got != tc.want {
+				t.Fatalf("HasProviderFolderMessagesMissingSender() = %v, %v; want %v", got, err, tc.want)
+			}
+		})
+	}
+}
+
+// A finished full sync records when it started, and a sync of changes keeps
+// that record.
+func TestUpdateProviderFolderSyncStateRecordsFullSyncStart(t *testing.T) {
+	db := newContactsTestDB(t)
+	ctx := t.Context()
+	if _, err := db.Write().ExecContext(ctx, `INSERT INTO accounts (id, user_id, provider, email_address) VALUES ('acc', 'default', 'outlook', 'alex@example.com')`); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertFolders(ctx, []UpsertFolderInput{{ID: "acc_inbox", AccountID: "acc", RemoteID: "Inbox", Name: "Inbox", Role: "inbox", Selectable: true}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.StartProviderFolderBaseline(ctx, "acc_inbox"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.Write().ExecContext(ctx, `UPDATE folders SET sync_progress_started_at = '2026-03-10 09:00:00' WHERE id = 'acc_inbox'`); err != nil {
+		t.Fatal(err)
+	}
+	startedAt := func() sql.NullString {
+		t.Helper()
+		var started sql.NullString
+		if err := db.Read().QueryRowContext(ctx, `SELECT last_full_sync_started_at FROM folders WHERE id = 'acc_inbox'`).Scan(&started); err != nil {
+			t.Fatal(err)
+		}
+		return started
+	}
+	if err := db.UpdateProviderFolderSyncState(ctx, "acc_inbox", "cursor-1", 1, 0, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := startedAt(); !got.Valid || !strings.HasPrefix(got.String, "2026-03-10") {
+		t.Fatalf("after a full sync, last_full_sync_started_at = %v, want 2026-03-10 09:00:00", got)
+	}
+	if err := db.UpdateProviderFolderSyncState(ctx, "acc_inbox", "cursor-2", 1, 0, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := startedAt(); !got.Valid || !strings.HasPrefix(got.String, "2026-03-10") {
+		t.Fatalf("after a sync of changes, last_full_sync_started_at = %v, want it kept", got)
+	}
+}
