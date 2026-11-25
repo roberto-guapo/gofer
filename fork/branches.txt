@@ -1,0 +1,14 @@
+# The branches fork/rebuild-pi.sh merges into pi, in this order. Each one is
+# based on upstream's master. Change this list on the fork/tools branch, then
+# rebuild; see FORK-MAINTENANCE.md.
+
+# Fork only. These stay.
+fork/tools
+fork/system-monitor
+
+# Waiting for upstream. Remove a line once upstream has the change.
+fix/outlook-subfolder-names
+
+# Kept off pi on purpose:
+# fix/outlook-sender-repair-once  raises the database schema to 154; add it
+#                                 only once upstream has taken that number.
