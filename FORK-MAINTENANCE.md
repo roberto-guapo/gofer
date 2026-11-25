@@ -1,10 +1,14 @@
 # Maintaining my Gofer fork
 
-These notes belong to the `pi` branch of [roberto-guapo/gofer](https://github.com/roberto-guapo/gofer). They describe my maintained version, including changes that upstream may not accept. Closing a pull request does not delete the changes from my fork.
+These notes describe the `pi` branch of [roberto-guapo/gofer](https://github.com/roberto-guapo/gofer): upstream's Gofer plus my own changes, including ones upstream may not accept. Closing a pull request does not delete a change from my fork.
 
 For installation and updates on the Raspberry Pi, start with [Installing my fork on a Raspberry Pi](./docs/raspberry-pi-fork.md). Downloading an upstream release does **not** include my unmerged changes.
 
-## Branches and remotes
+## How the fork is arranged
+
+Each of my changes lives on its own branch, based on upstream's `master`. `pi` is built from them by a script: it starts from `upstream/master` and merges every branch listed in [`fork/branches.txt`](./fork/branches.txt), in order. `pi` is never edited by hand; a change to it is a change to one of its branches, followed by a rebuild.
+
+This keeps every change ready to offer upstream, since its branch holds only that change. It also keeps each update to the same steps: fetch upstream and rebuild. When upstream takes a change, its line comes off the list and it's gone from `pi` at the next rebuild.
 
 | Name | Purpose |
 | --- | --- |
@@ -12,8 +16,13 @@ For installation and updates on the Raspberry Pi, start with [Installing my fork
 | `upstream` | Original project: `https://github.com/cristianadrielbraun/gofer.git` |
 | `upstream/master` | Local record of upstream's master branch, refreshed by `git fetch upstream`. |
 | `master` | A clean copy of upstream's `master` with nothing of mine on it. Never commit to it; bring it up to date instead. |
-| `pi` | `master` plus my own commits, listed below. Merge upstream improvements here and deploy this branch. |
-| `backup/*` | Recovery points made before syncing or rebuilding `pi`. Delete them once the new `pi` has been running without problems. |
+| `fix/*`, `feature/*` | A change meant for upstream, one per branch, based on `upstream/master`. |
+| `fork/*` | A change that stays in my fork, such as the system monitor. |
+| `fork/tools` | These notes, the Pi guide, [`fork/rebuild-pi.sh`](./fork/rebuild-pi.sh) and the list of branches `pi` is built from. |
+| `pi` | Built by `fork/rebuild-pi.sh`. Deployed to the Pi. Never commit to it directly. |
+| `backup/*` | The previous `pi`, kept by each rebuild. Delete them once the new `pi` has been running without problems. |
+
+The older branches `feature/system-monitor`, `feature/calendar-week-start` and `fork-docs` are kept for reference only. Nothing builds from them.
 
 To bring `master`, and my fork's copy of it, up to date with upstream:
 
@@ -25,113 +34,117 @@ git push origin master
 
 The second command only fast-forwards. If it refuses, something was committed to `master`; find it with `git log upstream/master..master` and move it to its own branch before trying again.
 
-On November 23, 2026, `pi` was rebuilt as upstream's `master` with my commits applied on top, replacing the earlier history of merges from `master` and feature branches. The older branches `feature/system-monitor`, `feature/calendar-week-start` and `fork-docs` are kept for reference only; `pi` no longer merges them.
-
 ## What `pi` adds to upstream
 
-As of November 24, 2026:
+[`fork/branches.txt`](./fork/branches.txt) is the exact list. As of November 24, 2026:
 
-| Change | Status upstream |
-| --- | --- |
-| Optional Linux [system monitor](./docs/system-monitor.md) in the sidebar | Fork only. Not submitted. |
-| Stop the message frame growing without end around emails that size themselves to it | Fixed on `pi`; not yet reported or submitted upstream. A pull request needs a test that fails without the fix. |
-| Show Outlook subfolders by their own name, such as "Conflicts" instead of "Sync Issues/Conflicts" | Fixed on `pi`, with a test. Not yet reported or submitted; the upstream-based branch is `fix/outlook-subfolder-names`. |
-| These notes and [the Pi installation guide](./docs/raspberry-pi-fork.md) | Fork only. |
+| Branch | Change | Status upstream |
+| --- | --- | --- |
+| `fork/tools` | These notes, [the Pi installation guide](./docs/raspberry-pi-fork.md) and the rebuild script | Fork only. |
+| `fork/system-monitor` | Optional Linux [system monitor](./docs/system-monitor.md) in the sidebar | Fork only. Not submitted. |
+| `fix/outlook-subfolder-names` | Show Outlook subfolders by their own name, such as "Conflicts" instead of "Sync Issues/Conflicts" | Has a test. Not yet reported or submitted. |
 
 Kept off `pi` on purpose:
 
-- **Stop rereading whole Outlook folders for messages without a sender**, on branch `fix/outlook-sender-repair-once`. Without it, an Outlook folder holding an item that has no sender, such as a draft in Deleted Items, is downloaded in full on every sync. The fix raises the database schema to version 154, and a schema number upstream hasn't taken could clash with a later upstream one. Wait for upstream to accept it, or renumber it, before deploying. Until then, emptying that folder in Outlook on the web stops the repeated downloads.
+- **`fix/outlook-sender-repair-once`: stop rereading whole Outlook folders for messages without a sender.** Without it, an Outlook folder holding an item that has no sender, such as a draft in Deleted Items, is downloaded in full on every sync. The fix raises the database schema to version 154. Schema versions are a single sequence, so a number upstream hasn't taken could clash with a later upstream one. Add it to the list once upstream accepts it, or after renumbering it to upstream's next free version. Until then, emptying that folder in Outlook on the web stops the repeated downloads.
 
 Earlier changes no longer need maintaining here:
 
 - Mail card action buttons ([#124](https://github.com/cristianadrielbraun/gofer/pull/124)), compose tab order ([#125](https://github.com/cristianadrielbraun/gofer/pull/125)), opening the database on Windows ([#126](https://github.com/cristianadrielbraun/gofer/pull/126)) and the Raspberry Pi setup guides ([#128](https://github.com/cristianadrielbraun/gofer/pull/128)) were merged upstream.
 - Keeping messages unread in unread-only views ([#127](https://github.com/cristianadrielbraun/gofer/pull/127)) was declined. Upstream did it differently instead: reading a message marks it read but leaves it in the Unread list until the list is refreshed.
 - My first-day-of-week setting was replaced by upstream's, which offers Saturday, Sunday or Monday and also covers date pickers. Upstream saves the setting differently, so a week start chosen with my version is ignored until it is chosen again in Settings › Regional.
+- My fix for message frames growing without end around emails that size themselves to the frame was replaced by upstream's own fix, "Stop some HTML emails from growing the reader without end" (`652ec01c`). It uses the same detection and also holds the height when the reader is resized or the message reloads.
 
-## Bring in the author's improvements
+## Update `pi` with the author's improvements
 
-Run these Git commands from the repository on the development computer. They work in PowerShell or a Linux shell. Start with a clean working tree: commit work that should be kept, or stash it and remember to restore it later.
+Run these on the development computer, from Git Bash or a Linux shell. Commit or stash any work in progress first.
 
 ```sh
-git switch pi
-git status
-git fetch upstream
-git log --oneline HEAD..upstream/master
+fork/rebuild-pi.sh
 ```
 
-Create a recovery branch before merging. Replace `YYYYMMDD` with today's date; use a new name if it already exists.
+The script:
+
+1. fetches upstream;
+2. reads the branch list from `fork/tools` (not from the current checkout);
+3. builds the new `pi` in a separate worktree next to this one, `../gofer-pi-rebuild`: `upstream/master`, then a merge of each listed branch;
+4. regenerates the templ files with the version in `go.mod`, and checks that the code builds;
+5. keeps the old `pi` as `backup/pi-before-rebuild-<time>`, moves `pi` to the new build, and moves this checkout with it if `pi` is checked out here.
+
+If anything fails, `pi` is left as it was. Nothing is pushed.
+
+To try a rebuild without touching `pi`, build another branch name with `fork/rebuild-pi.sh --target pi-next`.
+
+Then test the result. Run the Go tests on Linux, such as WSL, the Pi or a Docker build: on Windows, many of them fail for reasons unrelated to Gofer, such as Unix socket paths, symlinks and timer precision.
 
 ```sh
-git branch backup/pi-before-sync-YYYYMMDD
-git merge upstream/master
-```
-
-Review and test the result before publishing or installing it. Run the Go tests on Linux, such as WSL, the Pi or a Docker build: on Windows, many of them fail for reasons unrelated to Gofer, such as Unix socket paths, symlinks and timer precision.
-
-```sh
-git diff --check
-go test ./internal/systemmonitor ./internal/views ./internal/i18n
+git diff --check upstream/master pi
+go test ./internal/systemmonitor ./internal/views ./internal/i18n ./internal/mail
 go test ./internal/handler -run SystemMonitor
 node scripts/test-system-monitor.cjs
 ```
 
-Run other tests relevant to upstream's changes, or `go test ./...` for a large update, and build the release as described in the [Pi instructions](./docs/raspberry-pi-fork.md#build-my-version). A test that fails here should be checked against `upstream/master` in the same environment before blaming the merge. In the app, check the system monitor and open a few HTML newsletters before relying on the new build.
+Run other tests relevant to upstream's changes, or `go test ./...` for a large update. A test that fails here should be checked against `upstream/master` in the same environment before blaming my branches. In the app, check the system monitor and Outlook folders before relying on the new build.
+
+Publish it. A rebuild replaces `pi`'s history, so the push has to replace GitHub's copy; `--force-with-lease` refuses if GitHub's `pi` changed since I last fetched it:
 
 ```sh
-git push -u origin pi
+git push --force-with-lease origin pi
 ```
 
-Use ordinary merges and pushes for this long-lived branch. Routine upstream updates do not require rebasing or force-pushing. If Git rejects a push because `origin/pi` moved, fetch and inspect those commits before merging them; do not overwrite them blindly.
+Then [update the Pi](./docs/raspberry-pi-fork.md#update-without-losing-my-changes-or-data).
 
-### If there is a conflict
+### When a rebuild stops on a conflict
 
-1. Run `git status` to see the affected files.
-2. For generated `*_templ.go` files, don't merge by hand. Take either version, then run `templ generate --ignore-pattern='(^|/)dist(/|$)'` from the repository root with the templ version named in `go.mod`, so they are rebuilt from the merged `.templ` files.
-3. Edit each other file to keep the intended behavior from both versions. Remove the `<<<<<<<`, `=======`, and `>>>>>>>` markers.
-4. Stage each resolved file with `git add path/to/file`.
-5. Finish with `git commit`, then test before pushing.
+The script stops if a branch conflicts with `upstream/master` or with a branch merged before it, and names the files. Generated `*_templ.go` files never stop it, as they're always regenerated.
 
-To cancel a merge while it is still in progress:
+1. Open the rebuild worktree it names, `../gofer-pi-rebuild`.
+2. Edit each listed file to keep the intended behavior from both sides, and remove the `<<<<<<<`, `=======` and `>>>>>>>` markers.
+3. Stage the files with `git add`, then `git commit --no-edit`. Git records the resolution (`rerere`).
+4. Run `fork/rebuild-pi.sh` again. It starts over and applies the recorded resolution by itself, now and in later rebuilds, as long as the conflicting lines stay the same.
 
-```sh
-git merge --abort
-```
+If the conflict means upstream changed the same code for the same purpose, compare the two. Often the better fix is to update my branch instead: switch to it, rebase it onto `upstream/master` (`git rebase upstream/master`), resolve the conflict there once, and rebuild. A branch that will become a pull request needs that anyway.
 
-If upstream accepts or independently implements one of my changes, compare the behavior and resolve overlap during the merge. Do not automatically delete the feature or cherry-pick it again. A squash merge upstream may use different commit IDs for the same work.
+## Work on a change
 
-### Rebuild `pi` from upstream
-
-When `pi`'s history gets tangled, for example after reverting a change upstream replaced, it can be rebuilt instead of merged: start from `upstream/master` and reapply only my own commits.
-
-```sh
-git fetch upstream
-git log --oneline --no-merges upstream/master..pi   # the commits to keep
-git switch -c pi-rebuild upstream/master
-git cherry-pick COMMIT_SHA ...                     # oldest first; regenerate templ files on conflict
-git diff --stat pi pi-rebuild                      # should list only intended differences
-git branch backup/pi-before-rebuild-YYYYMMDD pi
-git branch -f pi pi-rebuild
-git switch pi
-git branch -D pi-rebuild
-```
-
-This rewrites `pi`'s history. Once `pi` is on GitHub, publishing a rebuilt `pi` needs `git push --force-with-lease origin pi`, and the Pi's checkout then has to be reset to it instead of pulled. Prefer ordinary merges once `pi` is pushed.
-
-## Make another focused PR
-
-Start from upstream rather than `pi`, so the PR does not include every fork customization. Replace the example branch name and `COMMIT_SHA` before running:
+Start every change from upstream, not from `pi`:
 
 ```sh
 git fetch upstream
 git switch -c fix/descriptive-name upstream/master
-git cherry-pick COMMIT_SHA
-# Review the diff and run the relevant checks.
-git diff --stat upstream/master...HEAD
-git log --format=full upstream/master..HEAD
-git push -u origin fix/descriptive-name
+# Make the change, with a test that fails without it, and commit.
 ```
 
-Open the PR from this new branch to `cristianadrielbraun/gofer:master`. Keep its title and summary limited to that change, and follow upstream's [CONTRIBUTING.md](./CONTRIBUTING.md): every fix needs a test that fails without it, and commits and summaries carry no Claude/AI author trailers or generated-by footer. Inspect the commit messages before submitting. Return to `pi` with `git switch pi` afterward.
+Add the branch to `fork/branches.txt` on `fork/tools`, then rebuild:
+
+```sh
+git switch fork/tools
+# Add the branch name to fork/branches.txt.
+git commit -am "Build pi with fix/descriptive-name"
+git switch pi
+fork/rebuild-pi.sh
+```
+
+To change something already on `pi`, commit to its branch and rebuild. The same goes for these notes: they're on `fork/tools`.
+
+### When upstream takes a change
+
+Upstream squashes pull requests, so Git can't tell that my commits are already there. Remove the branch's line from `fork/branches.txt` on `fork/tools`, rebuild, and delete the branch once the rebuilt `pi` works. If upstream implemented it differently, compare the behavior and prefer upstream's version unless mine does something theirs doesn't; then the branch stays, reduced to the difference.
+
+## Open a pull request
+
+A `fix/*` or `feature/*` branch already holds only its change, based on upstream. Bring it up to date and check it:
+
+```sh
+git fetch upstream
+git switch fix/descriptive-name
+git rebase upstream/master
+git diff --stat upstream/master...HEAD
+git log --format=full upstream/master..HEAD
+git push --force-with-lease -u origin fix/descriptive-name
+```
+
+Open the PR from that branch to `cristianadrielbraun/gofer:master`. Keep its title and summary limited to that change, and follow upstream's [CONTRIBUTING.md](./CONTRIBUTING.md): every fix needs a test that fails without it, and commits and summaries carry no Claude/AI author trailers or generated-by footer. Inspect the commit messages before submitting. Return to `pi` with `git switch pi` afterward.
 
 ## Local checkout reminders
 

@@ -105,20 +105,21 @@ curl -fsS http://127.0.0.1:8090/readyz
 cat ~/gofer/BUILD-COMMIT
 ```
 
-Adjust the health-check port if changed. Check **Settings → About** and exercise the custom compose, card-action, and unread-selection behavior. The source commit record identifies what was installed even though it is not an upstream release.
+Adjust the health-check port if changed. Check **Settings → About** and the fork's own features, such as the system monitor. The source commit record identifies what was installed even though it is not an upstream release.
 
 ## Update without losing my changes or data
 
-First merge upstream changes into `pi`, test, and push from the development computer using the [maintenance workflow](../FORK-MAINTENANCE.md#bring-in-the-authors-improvements). On the Pi, update from my fork:
+First rebuild `pi`, test it, and push it from the development computer using the [maintenance workflow](../FORK-MAINTENANCE.md#update-pi-with-the-authors-improvements). On the Pi, update from my fork:
 
 ```sh
 cd ~/src/gofer
 git status --short
-git pull --ff-only origin pi
+git fetch origin
+git reset --keep origin/pi
 task release
 ```
 
-Start with a clean checkout. If the pull fails because of local changes or diverged history, stop and inspect it; do not force-reset it. Run the build only after the pull succeeds. Recheck tool versions if the build requirements changed.
+`pi` is rebuilt rather than added to, so its history changes with each update and `git pull` can't follow it. `git reset --keep` moves the checkout to the new `pi` instead. It refuses, and changes nothing, if a file it would replace has local changes. This checkout is only used for building, so `git status --short` should print nothing. If it lists files, inspect them before updating; don't discard unexplained changes. Run the build only after the reset succeeds. Recheck tool versions if the build requirements changed.
 
 After the new build succeeds, stop Gofer and make a matching backup of the installed binary, data, configuration, and service. The following subshell stops on the first error. If it fails after stopping the service, inspect the failure before proceeding; do not replace the binary without a successful backup.
 
