@@ -640,6 +640,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 		mux.HandleFunc(route.pattern, route.handler(h))
 	}
 	mux.HandleFunc("GET /api/settings/ui", h.handleGetUISettings)
+	mux.HandleFunc("GET /api/system/monitor", h.systemMonitorHandler())
 	h.registerProfileTransferRoutes(func(pattern string, handler http.HandlerFunc) {
 		mux.HandleFunc(pattern, handler)
 	})

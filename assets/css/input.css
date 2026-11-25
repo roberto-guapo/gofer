@@ -3,6 +3,7 @@
 @import "./themes/minimal.css";
 @import "./themes/express.css";
 @import "./wolf.css";
+@import "./system-monitor.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 

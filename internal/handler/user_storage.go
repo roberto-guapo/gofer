@@ -205,6 +205,7 @@ func (h *Handler) RegisterUserStorageRoutes(ctx context.Context, mux *http.Serve
 		mux.HandleFunc(pattern, privateHandler(pattern, handler))
 	}
 	private("GET /api/settings/ui", routed.handleGetUISettings)
+	private("GET /api/system/monitor", routed.systemMonitorHandler())
 	private("GET /api/avatars/{hash}", routed.handleAvatarImage)
 	private("GET /api/provider-avatar", routed.handleProviderAvatarImage)
 	private("POST /api/avatars/warmup", routed.handleAvatarWarmup)

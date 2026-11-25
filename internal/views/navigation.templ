@@ -7,6 +7,7 @@ import "github.com/cristianadrielbraun/gofer/internal/assetver"
 import "github.com/cristianadrielbraun/gofer/components/progress"
 
 templ AppNavigationScripts() {
+	@SystemMonitorScripts()
 	<template id="compose-account-data"></template>
 	@progress.Script()
 	<script src={ assetver.URL("/assets/js/notification-avatar.js") }></script>
